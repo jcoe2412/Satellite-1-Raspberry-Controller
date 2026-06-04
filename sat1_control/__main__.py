@@ -1,18 +1,24 @@
 #!/usr/bin/env python3
 
 import argparse
+import inspect
 from time import sleep
 
 from sat1_control import LedController, SpeakerController
+from sat1_control.led.patterns import DefaultPattern
 
 
 def main():
     parser = argparse.ArgumentParser(prog="sat1_control")
     sub = parser.add_subparsers(dest="action", required=True)
 
+    _anim_choices = sorted(
+        m for m, _ in inspect.getmembers(DefaultPattern, predicate=inspect.isfunction)
+        if not m.startswith("_")
+    ) + ["off"]
+
     led = sub.add_parser("led")
-    led.add_argument("--animation", "-a", required=True,
-                     choices=["on_start", "on_error", "listen", "think", "speak", "off"])
+    led.add_argument("--animation", "-a", required=True, choices=_anim_choices)
     led.add_argument("--timeout", "-t", type=int, default=10)
     led.add_argument("--pattern", "-p", choices=["default"], default="default")
 
@@ -28,17 +34,10 @@ def main():
 
     if args.action == "led":
         ctl = LedController(pattern=args.pattern, timeout=args.timeout)
-        dispatch = {
-            "on_start": ctl.on_start,
-            "on_error": ctl.on_error,
-            "listen":   ctl.listen,
-            "think":    ctl.think,
-            "speak":    ctl.speak,
-        }
         if args.animation == "off":
             ctl.off()
         else:
-            dispatch[args.animation]()
+            getattr(ctl, args.animation)()
             try:
                 while ctl.animator.is_running:
                     sleep(0.1)

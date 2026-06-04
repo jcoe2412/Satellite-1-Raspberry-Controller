@@ -77,3 +77,15 @@ class LedController:
         if cls is None:
             raise ValueError(f"Unknown pattern {name!r}. Available: {list(_PATTERNS)}")
         return cls(self.animator)
+
+    def __getattr__(self, name: str):
+        # Called only when normal lookup fails — routes unknown names to the pattern.
+        pattern = self.__dict__.get("pattern")
+        if pattern is None:
+            raise AttributeError(name)
+        method = getattr(pattern, name, None)
+        if callable(method):
+            def _run(**kwargs):
+                self.animator.run(method, **kwargs)
+            return _run
+        raise AttributeError(f"{type(self).__name__!r} has no animation {name!r}")
