@@ -15,9 +15,14 @@ class SpeakerController:
 
     Volume is persisted to disk and restored on the next instantiation.
 
+    Hardware initialisation (power mode, TDM config, amp level) is owned by
+    satellite1-init.service at boot; this class only manages runtime controls
+    (volume and mute) and must not reset the chip on construction.
+
     Args:
         amp_level:   Amplifier output level 0–20. Default 10.
-        power_mode:  0 = USB/5V power, 2 = 9V+ USB-PD. Default 0.
+        power_mode:  'auto' = detect from USB-PD sysfs (default), 0 = 5V, 2 = 9V+.
+                     Only used if activate() is called explicitly after disable().
         volume_step: Step size for increase/decrease. Default 0.05.
         volume:      Initial volume 0.0–1.0. Loads from disk if not given.
         state_path:  Path for volume persistence. Defaults to ~/.cache/sat1/speaker/volume.
@@ -36,7 +41,7 @@ class SpeakerController:
     def __init__(
         self,
         amp_level: int = 10,
-        power_mode: int = 0,
+        power_mode: int | str = 'auto',
         volume_step: float = 0.05,
         volume: float | None = None,
         state_path: str | Path | None = None,
@@ -45,8 +50,8 @@ class SpeakerController:
         self._state_path = Path(state_path) if state_path else self._default_state_path()
 
         self._amp = _TAS2780(amp_level=amp_level, power_mode=power_mode)
-        self._amp.setup()
-        self._amp.activate()
+        # satellite1-init.service owns TAS2780 hardware init (power mode, TDM, amp level).
+        # Calling setup()/activate() here would send _RESET=0x01, wiping that configuration.
 
         self.set_volume(volume if volume is not None else self._load_volume())
 

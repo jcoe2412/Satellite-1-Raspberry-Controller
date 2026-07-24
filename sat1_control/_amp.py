@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 from smbus2 import SMBus
 
 log = logging.getLogger(__name__)
@@ -47,7 +48,7 @@ _POWER_MODES = [(2, 0), (0, 0), (3, 1), (1, 0)]
 
 class _TAS2780:
     def __init__(self, i2c_bus: int = _BUS, address: int = _ADDR,
-                 amp_level: int = 8, power_mode: int = 0):
+                 amp_level: int = 8, power_mode: int | str = 'auto'):
         self._bus       = SMBus(i2c_bus)
         self._addr      = address
         self.amp_level  = amp_level
@@ -128,7 +129,17 @@ class _TAS2780:
         self._apply_amp_level()
 
     def _set_power_mode(self):
-        cds, vbat = _POWER_MODES[self.power_mode]
+        mode = self.power_mode
+        if mode == 'auto':
+            try:
+                matches = list(
+                    Path("/sys/class/power_supply").glob("tcpm-source-psy-*/voltage_now")
+                )
+                v = int(matches[0].read_text()) if matches else 0
+                mode = 2 if v >= 9_000_000 else 0
+            except Exception:
+                mode = 0
+        cds, vbat = _POWER_MODES[mode]
         self._w(_CHNL, (self._r(_CHNL) & ~_CDS_MASK) | (cds << _CDS_SHIFT))
         self._w(_DCBLK, (self._r(_DCBLK) & ~(1 << _VBAT_SHIFT)) | (vbat << _VBAT_SHIFT))
 
