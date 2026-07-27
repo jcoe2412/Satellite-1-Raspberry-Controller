@@ -41,26 +41,46 @@ Reboot after the script completes.
 
 ---
 
-## ENABLE_PD — USB-C Power Delivery (9V)
+## USB-C Power Delivery (9V)
 
 By default the installer runs the system at stable **5V**. To negotiate 9V via USB-C
-PD (for louder audio through the TAS2780 amp), pass `ENABLE_PD=1`:
+PD (louder audio through the TAS2780 amp), use `toggle-pd.sh` after the main install:
 
 ```bash
-ENABLE_PD=1 sudo bash install.sh
+# Enable 9V PD
+curl -sSL https://raw.githubusercontent.com/jcoe2412/Satellite-1-Raspberry-Controller/main/toggle-pd.sh | sudo bash -s enable
+sudo reboot
+
+# Disable (back to 5V)
+curl -sSL https://raw.githubusercontent.com/jcoe2412/Satellite-1-Raspberry-Controller/main/toggle-pd.sh | sudo bash -s disable
+sudo reboot
+
+# Check current state (no root required)
+bash <(curl -sSL https://raw.githubusercontent.com/jcoe2412/Satellite-1-Raspberry-Controller/main/toggle-pd.sh) status
 ```
 
-This adds `dtoverlay=fusb302b` to `/boot/firmware/config.txt` so the FUSB302
-negotiates 9V at kernel boot time (the same approach as the FPH SDK default).
+Or if you already have the file locally:
 
-> **Warning:** Only use `ENABLE_PD=1` with a charger that does **not** drop VBUS
-> to 0V during the 5V→9V transition (GaN chargers, or the FPH-supplied charger).
+```bash
+sudo bash toggle-pd.sh enable    # 9V
+sudo bash toggle-pd.sh disable   # 5V
+bash toggle-pd.sh status         # show current state, no reboot needed
+```
+
+`toggle-pd.sh` makes two targeted edits: (un)comments `dtoverlay=fusb302b` in
+`/boot/firmware/config.txt`, and adds/removes `ExecStartPre=wait-for-pd.sh` in
+the `satellite1-init.service` override. It is idempotent and handles the
+read-only `/boot/firmware` mount automatically.
+
+> **Warning:** Only enable PD with a charger that does **not** drop VBUS to 0V
+> during the 5V→9V transition (GaN chargers, or the FPH-supplied charger).
 > A hard VBUS dropout reboots the Pi; the FUSB302 (VBUS-powered) survives and may
 > hold I2C SDA low, causing a kernel deadlock on the next boot. Unplug the USB-C
-> cable for 5 seconds and replug to recover.
+> cable for 5 seconds and replug to recover. If this happens, run
+> `sudo bash toggle-pd.sh disable` and reboot to restore stable 5V operation.
 
-Recommendation: start with `ENABLE_PD=0`, confirm everything works, then
-re-run with `ENABLE_PD=1` once you have a compatible charger.
+Recommendation: start with the default 5V install, confirm everything works, then
+enable PD once you have a compatible charger.
 
 ---
 
@@ -208,7 +228,7 @@ cat /sys/class/hwmon/hwmon*/humidity1_input
 ## Modifying /boot/firmware after install
 
 After install, `/boot/firmware` is mounted read-only (FAT32 corruption protection).
-To update `config.txt`, the kernel, or overlays:
+`toggle-pd.sh` handles the remount automatically. For any other manual changes:
 
 ```bash
 sudo mount -o remount,rw /boot/firmware
