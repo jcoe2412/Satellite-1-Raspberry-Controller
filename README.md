@@ -101,7 +101,7 @@ enable PD once you have a compatible charger.
 | 10 | Writes `/boot/firmware/config.txt` (conditionally adds `dtoverlay=fusb302b`) |
 | 11 | Configures kernel module autoload (`i2c-dev`) |
 | 12 | Sets journald to volatile storage (prevents journal corruption after power cuts) |
-| 13 | Installs this Python library into `~/sat1_venv/` |
+| 13 | Installs this Python library into `~/sat1_venv/` and symlinks `sat1-control` to `/usr/local/bin/` |
 | 14 | Marks `/boot/firmware` read-only in fstab (prevents FAT32 corruption on power cuts) |
 | 15 | Prints a verification checklist |
 
@@ -212,10 +212,10 @@ aplay -l && arecord -l
 speaker-test -c 2 -t sine -f 440 -D hw:GenericStereoAu,0
 
 # Python library
-~/sat1_venv/bin/sat1-control speaker --get-volume
+sat1-control speaker --get-volume
 
 # LED test
-~/sat1_venv/bin/sat1-control led --animation listen --timeout 5
+sat1-control led --animation listen --timeout 5
 
 # AHT20 temperature/humidity sensor
 cat /sys/class/hwmon/hwmon*/name
