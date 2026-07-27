@@ -109,20 +109,31 @@ DEFAULT_KERNEL_DEB="linux-image-6.12.58-v8-fusb302-v8_1fusb302_arm64.deb"
 DEFAULT_SETUP_DEB="satellite1-rpi-setup_1.0-1_arm64.deb"
 DEFAULT_SDK_DEB="satellite1-rpi-sdk_0.1.4-1_arm64.deb"
 
-KERNEL_DEB="${1:-$DEFAULT_KERNEL_DEB}"
-SETUP_DEB="${2:-$DEFAULT_SETUP_DEB}"
-SDK_DEB="${3:-$DEFAULT_SDK_DEB}"
+# ── Download directory ────────────────────────────────────────────────────────
+# All .deb files land here — avoids littering whatever directory the user ran
+# the script from (especially important when piped via curl).
+WORK_DIR="/tmp/satellite1-install"
+mkdir -p "$WORK_DIR"
+
+# Positional args allow passing pre-downloaded files; otherwise use WORK_DIR.
+KERNEL_DEB="${1:-$WORK_DIR/$DEFAULT_KERNEL_DEB}"
+SETUP_DEB="${2:-$WORK_DIR/$DEFAULT_SETUP_DEB}"
+SDK_DEB="${3:-$WORK_DIR/$DEFAULT_SDK_DEB}"
 
 # ── Auto-download missing .deb files from GitHub release ─────────────────────
 RELEASE_URL="https://github.com/jcoe2412/Satellite-1-Raspberry-Controller/releases/latest/download"
 
 download_if_missing() {
-    local file="$1"
-    if [[ ! -f "$file" ]]; then
-        info "Downloading $file ..."
-        wget -q --show-progress -O "$file" "$RELEASE_URL/$file" \
-            || error "Failed to download $file from $RELEASE_URL/$file"
-        success "Downloaded $file"
+    local dest="$1"
+    local filename
+    filename="$(basename "$dest")"
+    if [[ ! -f "$dest" ]]; then
+        info "Downloading $filename to $WORK_DIR/ ..."
+        wget -q --show-progress -O "$dest" "$RELEASE_URL/$filename" \
+            || error "Failed to download $filename from $RELEASE_URL/$filename"
+        success "Downloaded $filename"
+    else
+        info "Using cached $filename from $(dirname "$dest")/"
     fi
 }
 
