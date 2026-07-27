@@ -702,16 +702,6 @@ sudo -u "$REAL_USER" "$VENV_DIR/bin/pip" install \
 ln -sf "$VENV_DIR/bin/sat1-control" /usr/local/bin/sat1-control
 success "sat1-control symlinked to /usr/local/bin/sat1-control"
 
-BASHRC="$REAL_HOME/.bashrc"
-if ! grep -q 'sat1_venv' "$BASHRC" 2>/dev/null; then
-    cat >> "$BASHRC" <<'BASHRC_APPEND'
-
-# Satellite1 SDK
-alias sat1-control="$HOME/sat1_venv/bin/sat1-control"
-BASHRC_APPEND
-    chown "$REAL_USER:$REAL_USER" "$BASHRC"
-fi
-
 success "sat1-control installed in $VENV_DIR"
 
 # =============================================================================
@@ -749,8 +739,8 @@ echo "  systemctl status satellite1-init     # → active (exited)"
 echo "  systemctl status aht20-boot          # → active (exited)"
 echo "  aplay -l && arecord -l               # → GenericStereoAudioCodec listed"
 echo "  speaker-test -c 2 -t sine -f 440 -D hw:GenericStereoAu,0"
-echo "  ~/sat1_venv/bin/sat1-control speaker --get-volume"
-echo "  ~/sat1_venv/bin/sat1-control led --animation listen --timeout 5"
+echo "  sat1-control speaker --get-volume"
+echo "  sat1-control led --animation listen --timeout 5"
 echo ""
 echo "  # AHT20 temperature/humidity (hwmon):"
 echo "  cat /sys/class/hwmon/hwmon*/name"
