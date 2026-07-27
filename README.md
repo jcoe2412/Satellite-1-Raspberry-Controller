@@ -1,129 +1,224 @@
-# Satellite 1 Raspberry Controller
+# Satellite-1-Raspberry-Controller
 
-Control the [Satellite 1 HAT by FutureProofHomes](https://futureproofhomes.net/) from a Raspberry Pi.
+Python library and full-system installer for the
+[FutureProofHomes Satellite1 HAT](https://futureproofhomes.net/) on a
+**Raspberry Pi Zero 2W** running **Raspberry Pi OS Bookworm 64-bit**.
 
-Tested on Raspberry Pi OS 13 (Trixie) 32-bit — Raspberry Pi Zero 2 W.
-
----
-
-### Install
-
-Install system dependencies:
-```bash
-sudo apt install python3-dev git
-```
-
-Create a virtualenv and install:
-```bash
-python -m venv sat1_venv
-sat1_venv/bin/pip install git+https://github.com/corus87/Satellite-1-Raspberry-Controller
-```
+This is a fork of [corus87/Satellite-1-Raspberry-Controller](https://github.com/corus87/Satellite-1-Raspberry-Controller)
+with targeted fixes and a complete system installer.
 
 ---
 
-### Usage as a library
+## What's different from corus87
+
+| Area | Change |
+|---|---|
+| `SpeakerController` | No longer resets the TAS2780 on construction. `satellite1-init.service` owns hardware init (power mode, TDM, amp level). Calling `setup()`/`activate()` in the constructor was wiping the chip's configuration after every boot. |
+| `_TAS2780` power mode | Default changed from hardcoded `0` (5V) to `'auto'`. Auto mode reads the USB-C PD contract voltage from sysfs and selects mode `2` (9V+) when available, falling back to mode `0` (5V). |
+| System installer | New `install.sh` configures the full hardware stack from a clean Bookworm image. |
+
+---
+
+## One-liner system install
+
+Covers everything: custom FUSB302 kernel, device tree overlays, DAC init service,
+I2S audio, ALSA multi-app config, AHT20 sensor, boot hardening, and this Python library.
+
+```bash
+curl -sSL https://raw.githubusercontent.com/jcoe2412/Satellite-1-Raspberry-Controller/main/install.sh \
+  | sudo bash
+```
+
+Or download and inspect first (recommended):
+
+```bash
+wget https://raw.githubusercontent.com/jcoe2412/Satellite-1-Raspberry-Controller/main/install.sh
+# review install.sh ...
+sudo bash install.sh
+```
+
+Reboot after the script completes.
+
+---
+
+## ENABLE_PD — USB-C Power Delivery (9V)
+
+By default the installer runs the system at stable **5V**. To negotiate 9V via USB-C
+PD (for louder audio through the TAS2780 amp), pass `ENABLE_PD=1`:
+
+```bash
+ENABLE_PD=1 sudo bash install.sh
+```
+
+This adds `dtoverlay=fusb302b` to `/boot/firmware/config.txt` so the FUSB302
+negotiates 9V at kernel boot time (the same approach as the FPH SDK default).
+
+> **Warning:** Only use `ENABLE_PD=1` with a charger that does **not** drop VBUS
+> to 0V during the 5V→9V transition (GaN chargers, or the FPH-supplied charger).
+> A hard VBUS dropout reboots the Pi; the FUSB302 (VBUS-powered) survives and may
+> hold I2C SDA low, causing a kernel deadlock on the next boot. Unplug the USB-C
+> cable for 5 seconds and replug to recover.
+
+Recommendation: start with `ENABLE_PD=0`, confirm everything works, then
+re-run with `ENABLE_PD=1` once you have a compatible charger.
+
+---
+
+## What the installer does
+
+| Step | Description |
+|---|---|
+| 0 | Sanity checks. Auto-downloads the three `.deb` packages from GitHub Releases if not present locally. |
+| 1 | Fixes any broken apt state |
+| 2 | Installs system packages (`i2c-tools`, `git`, `python3-dev`, `device-tree-compiler`, `alsa-utils`) |
+| 3 | Installs the custom FUSB302 kernel `.deb` |
+| 4 | Copies kernel + initrd into `/boot/firmware/` |
+| 5 | Installs `satellite1-rpi-setup` `.deb` (DTBs + overlays) |
+| 6 | Installs `satellite1-rpi-sdk` `.deb` (sat1 CLI + DAC init service) |
+| 7 | Fixes `satellite1-init.service`: speaker mode, optional PD wait, I2C ordering, timeout cap, `audio_out.py` None-guard for missing FUSB302 |
+| 8 | Compiles + installs the `genericstereoaudiocodec` I2S overlay |
+| 9 | Writes `~/.asoundrc` (software volume, multi-app ALSA config with dmix/dsnoop) |
+| 10 | Writes `/boot/firmware/config.txt` (conditionally adds `dtoverlay=fusb302b`) |
+| 11 | Configures kernel module autoload (`i2c-dev`) |
+| 12 | Sets journald to volatile storage (prevents journal corruption after power cuts) |
+| 13 | Installs this Python library into `~/sat1_venv/` |
+| 14 | Marks `/boot/firmware` read-only in fstab (prevents FAT32 corruption on power cuts) |
+| 15 | Prints a verification checklist |
+
+The script is **idempotent** — safe to re-run after a partial failure.
+
+---
+
+## Required .deb packages
+
+Three packages are downloaded automatically from [GitHub Releases](https://github.com/jcoe2412/Satellite-1-Raspberry-Controller/releases/latest)
+if not present in the current directory:
+
+| File | Size | Description |
+|---|---|---|
+| `linux-image-6.12.58-v8-fusb302-v8_1fusb302_arm64.deb` | 31 MB | Custom kernel with FUSB302B + TCPM support |
+| `satellite1-rpi-setup_1.0-1_arm64.deb` | 2.6 MB | Device tree blobs + overlays |
+| `satellite1-rpi-sdk_0.1.4-1_arm64.deb` | 4.2 KB | sat1 CLI, DAC init service |
+
+---
+
+## Prerequisites
+
+- Raspberry Pi Zero 2W
+- Raspberry Pi OS **Bookworm 64-bit** (clean image recommended)
+- FutureProofHomes Satellite1 HAT
+- USB-C power supply (see ENABLE_PD note above)
+- Internet access on the Pi (for downloading packages, unless you pre-copy the `.deb` files)
+
+---
+
+## Python library — usage
+
+Install the library only (without the full system installer):
+
+```bash
+python3 -m venv sat1_venv
+sat1_venv/bin/pip install git+https://github.com/jcoe2412/Satellite-1-Raspberry-Controller
+```
+
+### LED controller
 
 ```python
-from sat1_control import LedController, SpeakerController, Buttons
+from sat1_control import LedController
 from time import sleep
 
-# LED animations
-led = LedController(timeout=30)
-led.listen()
-led.wait()
-led.off()
+led = LedController()
+led.set_animation("listen")
+sleep(5)
+led.set_animation("idle")
+```
 
-# Speaker
+### Speaker controller
+
+```python
+from sat1_control import SpeakerController
+
 spk = SpeakerController()
 spk.set_volume(0.7)
 spk.increase_volume()
-spk.decrease_volume()
 spk.mute_on()
 spk.mute_off()
 print(spk.volume)
+spk.disable()
+```
 
-# Buttons
-btn = Buttons()
-while True:
-    if btn.up.pressed_edge:
-        spk.increase_volume()
-    if btn.down.pressed_edge:
-        spk.decrease_volume()
-    if btn.mute.pressed:
-        spk.mute_on()
-    sleep(0.05)
+> Note: `SpeakerController` does **not** reset or reinitialize the TAS2780.
+> Hardware init is owned by `satellite1-init.service` at boot. Volume and mute
+> are the only runtime controls managed here.
+
+### Buttons (Flic)
+
+```python
+from sat1_control import Buttons
+
+def on_single(btn):
+    print(f"Single click: {btn}")
+
+def on_double(btn):
+    print(f"Double click: {btn}")
+
+def on_hold(btn):
+    print(f"Hold: {btn}")
+
+buttons = Buttons(on_single=on_single, on_double=on_double, on_hold=on_hold)
+buttons.start()
 ```
 
 ---
 
-### CLI
+## Post-install verification
+
+After rebooting:
 
 ```bash
-sat1-control led --animation listen --timeout 30
-sat1-control led --animation think
-sat1-control led --animation speak
-sat1-control led --animation on_error
-sat1-control led --animation off
+# Kernel version
+uname -r
+# → 6.12.58-v8-fusb302-v8
 
-sat1-control speaker --set-volume 0.7
-sat1-control speaker --increase
-sat1-control speaker --decrease
-sat1-control speaker --mute-on
-sat1-control speaker --mute-off
-sat1-control speaker --get-volume
-```
+# Services
+systemctl status satellite1-init
+systemctl status aht20-boot
 
-**LED options:**
-```
---animation, -a  on_start | on_error | listen | think | speak | off
---timeout,   -t  Auto-stop timeout in seconds (default: 10)
---pattern,   -p  Pattern to use (default: default)
-```
+# Audio devices
+aplay -l && arecord -l
+# → GenericStereoAudioCodec listed
 
-**Speaker options:**
-```
---set-volume, -v  Set volume 0.0–1.0
---increase,   -i  Increase volume by one step
---decrease,   -d  Decrease volume by one step
---mute-on,    -m  Mute
---mute-off,   -u  Unmute
---get-volume, -g  Print current volume
+# Speaker test
+speaker-test -c 2 -t sine -f 440 -D hw:GenericStereoAu,0
+
+# Python library
+~/sat1_venv/bin/sat1-control speaker --get-volume
+
+# LED test
+~/sat1_venv/bin/sat1-control led --animation listen --timeout 5
+
+# AHT20 temperature/humidity sensor
+cat /sys/class/hwmon/hwmon*/name
+cat /sys/class/hwmon/hwmon*/temp1_input    # divide by 1000 for °C
+cat /sys/class/hwmon/hwmon*/humidity1_input
 ```
 
 ---
 
-### Audio setup (I2S / ALSA)
+## Modifying /boot/firmware after install
 
-To use the speaker and microphone, a device tree overlay is required.
+After install, `/boot/firmware` is mounted read-only (FAT32 corruption protection).
+To update `config.txt`, the kernel, or overlays:
 
-Compile and install the overlay:
 ```bash
-wget https://raw.githubusercontent.com/corus87/Satellite-1-Raspberry-Controller/refs/heads/main/extras/genericstereoaudiocodec.dts -O /tmp/genericstereoaudiocodec.dts
-sudo dtc -@ -H epapr -O dtb -o /boot/overlays/genericstereoaudiocodec.dtbo -Wno-unit_address_vs_reg /tmp/genericstereoaudiocodec.dts
+sudo mount -o remount,rw /boot/firmware
+# ... make changes ...
+sudo mount -o remount,ro /boot/firmware
 ```
 
-Edit `/boot/firmware/config.txt` — enable I2C, I2S, SPI and add the overlay:
-```
-dtparam=i2c_arm=on
-dtparam=i2s=on
-dtparam=spi=on
+---
 
-[all]
-dtoverlay=genericstereoaudiocodec
-```
+## Credits
 
-Optionally install the ALSA config for software volume control, multi-app access and 48 kHz default:
-```bash
-wget https://raw.githubusercontent.com/corus87/Satellite-1-Raspberry-Controller/refs/heads/main/extras/asoundrc -O ~/.asoundrc
-```
-
-Reboot:
-```bash
-sudo reboot
-```
-
-Record and play back a test sample:
-```bash
-arecord -f S16_LE -r 48000 -c 1 -t wav -d 5 test.wav
-aplay test.wav
-```
+Original library by [corus87](https://github.com/corus87/Satellite-1-Raspberry-Controller).
+Hardware by [FutureProofHomes](https://futureproofhomes.net/).
