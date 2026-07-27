@@ -697,6 +697,11 @@ sudo -u "$REAL_USER" "$VENV_DIR/bin/pip" install --upgrade pip --quiet
 sudo -u "$REAL_USER" "$VENV_DIR/bin/pip" install \
     git+https://github.com/jcoe2412/Satellite-1-Raspberry-Controller
 
+# Symlink sat1-control to /usr/local/bin so it is available to all users
+# and services (including eldaspeaker.service which runs as the 'elda' user).
+ln -sf "$VENV_DIR/bin/sat1-control" /usr/local/bin/sat1-control
+success "sat1-control symlinked to /usr/local/bin/sat1-control"
+
 BASHRC="$REAL_HOME/.bashrc"
 if ! grep -q 'sat1_venv' "$BASHRC" 2>/dev/null; then
     cat >> "$BASHRC" <<'BASHRC_APPEND'
