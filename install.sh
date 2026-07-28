@@ -173,6 +173,7 @@ success "Sanity checks passed."
 # =============================================================================
 banner "STEP 1 — Fix broken apt state"
 
+dpkg --configure -a || warn "dpkg --configure -a reported issues — continuing"
 apt-get update -qq
 apt --fix-broken install -y || warn "apt --fix-broken reported issues — continuing"
 success "apt state clean."
