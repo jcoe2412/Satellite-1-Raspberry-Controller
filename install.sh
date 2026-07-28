@@ -510,13 +510,15 @@ success "genericstereoaudiocodec.dtbo compiled and installed."
 # =============================================================================
 # STEP 9 — Write ~/.asoundrc
 # =============================================================================
-banner "STEP 9 — ALSA config (~/.asoundrc)"
+banner "STEP 9 — ALSA config (/etc/asound.conf)"
 
-ASOUNDRC="$REAL_HOME/.asoundrc"
+# System-wide config so every user and service (including elda) gets the correct
+# audio routing without needing a per-user ~/.asoundrc.
+ASOUNDRC="/etc/asound.conf"
 [[ -f "$ASOUNDRC" ]] && cp "$ASOUNDRC" "${ASOUNDRC}.bak" && info "Backed up $ASOUNDRC"
 
 cat > "$ASOUNDRC" <<'ALSA'
-# ~/.asoundrc — Satellite1 / genericstereoaudiocodec
+# /etc/asound.conf — Satellite-1 HAT / genericstereoaudiocodec
 
 pcm.GenericStereoAu_playback {
     type hw
@@ -588,7 +590,6 @@ pcm.!default {
 }
 ALSA
 
-chown "$REAL_USER:$REAL_USER" "$ASOUNDRC"
 success "ALSA config written to $ASOUNDRC"
 
 # =============================================================================

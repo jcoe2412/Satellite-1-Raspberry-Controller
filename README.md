@@ -97,7 +97,7 @@ enable PD once you have a compatible charger.
 | 6 | Installs `satellite1-rpi-sdk` `.deb` (sat1 CLI + DAC init service) |
 | 7 | Fixes `satellite1-init.service`: speaker mode, optional PD wait, I2C ordering, timeout cap, `audio_out.py` None-guard for missing FUSB302 |
 | 8 | Compiles + installs the `genericstereoaudiocodec` I2S overlay |
-| 9 | Writes `~/.asoundrc` (software volume, multi-app ALSA config with dmix/dsnoop) |
+| 9 | Writes `/etc/asound.conf` (system-wide dmix/dsnoop — applies to all users and services) |
 | 10 | Writes `/boot/firmware/config.txt` (conditionally adds `dtoverlay=fusb302b`) |
 | 11 | Configures kernel module autoload (`i2c-dev`) |
 | 12 | Sets journald to volatile storage (prevents journal corruption after power cuts) |
