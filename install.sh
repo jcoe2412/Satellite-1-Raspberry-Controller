@@ -693,10 +693,10 @@ success "Journald volatile storage configured."
 # =============================================================================
 banner "STEP 13 — Python SDK (sat1-control)"
 
-VENV_DIR="$REAL_HOME/sat1_venv"
-sudo -u "$REAL_USER" python3 -m venv "$VENV_DIR"
-sudo -u "$REAL_USER" "$VENV_DIR/bin/pip" install --upgrade pip --quiet
-sudo -u "$REAL_USER" "$VENV_DIR/bin/pip" install \
+VENV_DIR="/opt/sat1_venv"
+python3 -m venv "$VENV_DIR"
+"$VENV_DIR/bin/pip" install --upgrade pip --quiet
+"$VENV_DIR/bin/pip" install \
     git+https://github.com/jcoe2412/Satellite-1-Raspberry-Controller
 
 # Symlink sat1-control to /usr/local/bin so it is available to all users
