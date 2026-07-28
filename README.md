@@ -19,6 +19,23 @@ with targeted fixes and a complete system installer.
 
 ---
 
+## Prerequisites — Flash the OS first
+
+Use **Raspberry Pi Imager** to flash Raspberry Pi OS Bookworm 64-bit onto the SD card.
+In the imager's advanced settings (gear icon):
+- Set **username** to `elda`
+- Set a **password** (you'll use this for SSH)
+- Enable **SSH**
+- Configure **WiFi** (or leave blank and set it up manually later)
+
+Both this installer and EldaSpeaker's installer detect the current user automatically,
+so using `elda` as the OS username ensures consistent file ownership and a single SSH
+login for everything.
+
+SSH into the Pi as `elda` before running any installer.
+
+---
+
 ## One-liner system install
 
 Covers everything: custom FUSB302 kernel, device tree overlays, DAC init service,
