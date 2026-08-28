@@ -99,6 +99,37 @@ read-only `/boot/firmware` mount automatically.
 Recommendation: start with the default 5V install, confirm everything works, then
 enable PD once you have a compatible charger.
 
+### Verifying PD actually took effect
+
+A reboot is required after `toggle-pd.sh enable`/`disable` — the overlay only loads
+at boot, and `satellite1-init.service` only picks the amp's power mode once, at
+startup. `toggle-pd.sh status` just reports what's configured in `config.txt`, not
+what's actually negotiated or applied. To check the real state after rebooting:
+
+```bash
+# 1. Confirm VBUS actually negotiated 9V (µV; 9000000 = 9V, 5000000 = 5V)
+cat /sys/class/power_supply/tcpm-source-psy-1-0022/voltage_now
+
+# 2. Confirm the amp chip itself was configured for it (not just VBUS) —
+#    reads the TAS2780's power-mode registers directly over I2C
+curl -sSL https://raw.githubusercontent.com/jcoe2412/Satellite-1-Raspberry-Controller/main/check-amp-power-mode.sh | sudo bash
+
+# 3. Did wait-for-pd.sh see the PD contract in time, or time out?
+journalctl -t wait-for-pd -b
+
+# 4. A/B the loudness difference directly
+curl -sSL https://raw.githubusercontent.com/jcoe2412/Satellite-1-Raspberry-Controller/main/test-pd-audio.sh -o test-pd-audio.sh
+bash test-pd-audio.sh
+```
+
+Step 2 matters on its own: `voltage_now` reading 9V only confirms the charger/PD
+negotiation, not that the amp was actually switched — the amp's power mode is set
+once at boot from whatever `voltage_now` read *at that moment*, so a slow PD
+negotiation racing `wait-for-pd.sh`'s 20s timeout can leave the amp stuck in 5V
+mode even though the rail later reads 9V. `check-amp-power-mode.sh` reads the
+amp's `CHNL_0`/`DC_BLK0` registers directly to confirm which mode is actually
+active, independent of what any log or sysfs file claims.
+
 ---
 
 ## What the installer does
